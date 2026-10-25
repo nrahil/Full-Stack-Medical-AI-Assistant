@@ -1,0 +1,15 @@
+**/.git
+**/.gitignore
+**/node_modules
+**/.next
+**/build
+**/dist
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.local
+**/.pytest_cache
+**/.vscode
+**/.idea
+**/chat_history.db
+backend/uploaded_files/*
