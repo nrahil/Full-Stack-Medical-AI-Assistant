@@ -1,5 +1,11 @@
 # 🩺 Full-Stack Medical AI Assistant
 
+[![CI Pipeline](https://github.com/nrahil/Full-Stack-Medical-AI-Assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/nrahil/Full-Stack-Medical-AI-Assistant/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
+
 > An intelligent, full-stack Medical AI Assistant that combines **Retrieval-Augmented Generation (RAG), Agentic AI, conversational memory, and secure authentication** to provide context-aware answers from user-uploaded medical documents.
 
 Built with **Next.js, TypeScript, Python, LangChain, LangGraph, and modern vector search technologies**, this project demonstrates how Generative AI can be integrated into a production-style full-stack application.
@@ -224,97 +230,105 @@ This architecture makes the system easier to extend with additional tools and sp
 
 # ⚙️ Getting Started
 
-## 1. Clone the Repository
+### Option A: Quickstart with Docker Compose (Recommended)
 
-```bash
-git clone https://github.com/sameeryellamandala/Full-Stack-Medical-AI-Assistant.git
+The easiest way to spin up both the FastAPI backend and Next.js frontend is using Docker Compose:
 
-cd Full-Stack-Medical-AI-Assistant
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/nrahil/Full-Stack-Medical-AI-Assistant.git
+   cd Full-Stack-Medical-AI-Assistant
+   ```
+
+2. **Configure environment variables:**
+   ```bash
+   cp backend/.env.example backend/.env
+   cp med-ai-frontend/.env.example med-ai-frontend/.env
+   ```
+   *Edit `backend/.env` with your Groq and Pinecone keys, and `med-ai-frontend/.env` with your Clerk keys.*
+
+3. **Launch the services:**
+   ```bash
+   docker compose up --build
+   ```
+   * Backend will be accessible at: `http://localhost:8000`
+   * Frontend will be accessible at: `http://localhost:3000`
 
 ---
 
-## 2. Backend Setup
+### Option B: Manual Local Setup
+
+#### 1. Backend Setup
 
 Navigate to the backend:
-
 ```bash
 cd backend
 ```
 
-Create a virtual environment:
-
+Create and activate a virtual environment:
 ```bash
+# Windows
 python -m venv venv
-```
-
-Activate it on Windows:
-
-```bash
 venv\Scripts\activate
+
+# macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 Install dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
 
----
+Set up environment variables:
+```bash
+cp .env.example .env
+```
+Fill in your `GROQ_API_KEY`, `PINECONE_API_KEY`, and `PINECONE_INDEX_NAME`.
 
-## 3. Configure Environment Variables
-
-Create a `.env` file in the appropriate backend/frontend directories and add the required API keys and configuration values.
-
-Example:
-
-```env
-LLM_API_KEY=your_api_key
-VECTOR_DB_API_KEY=your_api_key
-CLERK_SECRET_KEY=your_secret_key
+Create the Pinecone index (if running for the first time):
+```bash
+python create_index.py
 ```
 
-**Never commit `.env` files or API keys to GitHub.**
-
----
-
-## 4. Start the Backend
-
-Run the Python backend using the project's configured server command.
-
-For example:
-
+Run the backend server:
 ```bash
 python main.py
+# or: uvicorn main:app --reload --port 8000
+```
+
+Run the backend test suite:
+```bash
+pytest -v
 ```
 
 ---
 
-## 5. Start the Frontend
+#### 2. Frontend Setup
 
-Open another terminal:
-
+Open a new terminal window:
 ```bash
 cd med-ai-frontend
 ```
 
-Install dependencies:
+Set up environment variables:
+```bash
+cp .env.example .env.local
+```
+Add your Clerk keys from the [Clerk Dashboard](https://dashboard.clerk.com).
 
+Install dependencies:
 ```bash
 npm install
 ```
 
-Start the development server:
-
+Start the Next.js development server:
 ```bash
 npm run dev
 ```
 
-Then open:
-
-```text
-http://localhost:3000
-```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
@@ -346,15 +360,29 @@ Because conversation history is maintained, the assistant can understand that **
 
 ---
 
-//output 
-<img width="1897" height="993" alt="Screenshot 2026-09-12 102925" src="https://github.com/user-attachments/assets/f6b8aeb1-0bc8-49e3-b955-76e93f6552b8" />
-<img width="1911" height="1045" alt="Screenshot 2026-09-12 102948" src="https://github.com/user-attachments/assets/42da07ac-d271-491a-ac62-f347ffe291ae" />
+## 📸 Screenshots & UI Previews
 
-<img width="1548" height="852" alt="Screenshot 2026-09-12 102853" src="https://github.com/user-attachments/assets/586f570f-0d83-4aef-aa29-92ff488c4c14" />
-<img width="1902" height="997" alt="Screenshot 2026-09-12 102913" src="https://github.com/user-attachments/assets/9de17237-4b14-498b-a404-23b6a245723d" />
+<div align="center">
+  <img width="900" alt="Chat Interface" src="https://github.com/user-attachments/assets/f6b8aeb1-0bc8-49e3-b955-76e93f6552b8" />
+  <p><em>Interactive Medical AI Chat Interface with Context Grounding</em></p>
+</div>
 
+<div align="center">
+  <img width="900" alt="Session History" src="https://github.com/user-attachments/assets/42da07ac-d271-491a-ac62-f347ffe291ae" />
+  <p><em>Document Ingestion & Multi-Session History</em></p>
+</div>
 
+<div align="center">
+  <img width="900" alt="Authentication View" src="https://github.com/user-attachments/assets/586f570f-0d83-4aef-aa29-92ff488c4c14" />
+  <p><em>Secure Authentication Flow powered by Clerk</em></p>
+</div>
 
+<div align="center">
+  <img width="900" alt="Document Q&A" src="https://github.com/user-attachments/assets/9de17237-4b14-498b-a404-23b6a245723d" />
+  <p><em>Context-Aware Follow-up Medical Consultation</em></p>
+</div>
+
+---
 
 # 🔒 Security & Privacy
 
@@ -402,38 +430,29 @@ The goal is to demonstrate how **Generative AI, RAG, Agentic AI, and full-stack 
 
 ---
 
+# 🚧 Roadmap & Improvements
 
-# 🚧 Future Improvements
-
-* [ ] Multi-document reasoning
-* [ ] Improved retrieval using hybrid search
-* [ ] Better document metadata filtering
-* [ ] Source/page citations in responses
-* [ ] Streaming AI responses
-* [ ] More specialized medical AI agents
-* [ ] Improved evaluation and RAG metrics
-* [ ] Production deployment
-* [ ] Automated testing
-* [ ] Observability and AI tracing
+* [x] **Automated Testing**: Unit test suite using `pytest` for chat storage and API endpoints
+* [x] **Containerization**: Multi-service `docker-compose` orchestration for backend and frontend
+* [x] **CI/CD Pipeline**: GitHub Actions for automated linting, test runs, and validation
+* [ ] Multi-document reasoning & cross-document synthesis
+* [ ] Advanced hybrid search (combining dense vector search + BM25)
+* [ ] Source/page citations in LLM responses
+* [ ] Streaming AI responses via WebSockets / SSE
+* [ ] Observability and AI tracing (LangSmith / OpenTelemetry)
 
 ---
 
-# 👨‍💻 Author
+# 👨‍💻 Maintainer
 
-**Sameer Yellamandala**
+**Rahil Netipattu**
+* GitHub: [@nrahil](https://github.com/nrahil)
+* Email: [netipatturahil@gmail.com](mailto:netipatturahil@gmail.com)
 
-B.Tech Computer Science Student | Generative AI Developer
+---
 
-Interested in:
+# 📄 License
 
-* 🤖 Generative AI
-* 🧠 LLMs
-* 🔍 RAG Systems
-* 🦾 Agentic AI
-* 🕸️ LangChain & LangGraph
-* 💻 Data Structures & Algorithms
-* 🚀 Full-Stack AI Applications
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-
-**Repository:**
-https://github.com/sameeryellamandala/Full-Stack-Medical-AI-Assistant
+*Acknowledgments: Inspired by open-source RAG architectures and medical assistant reference designs.*
