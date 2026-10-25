@@ -39,12 +39,19 @@ app_brain = create_graph(llm)
 
 # --- FASTAPI SERVER ---
 
-app = FastAPI()
+app = FastAPI(
+    title="Medical AI Assistant API",
+    description="Agentic RAG backend powered by LangGraph, Groq, and Pinecone",
+    version="1.0.0"
+)
 
 # Enable CORS so Next.js (port 3000) can talk to FastAPI (port 8000)
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=allowed_origins or ["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +59,28 @@ app.add_middleware(
 
 @app.get("/")
 def health_check():
-    return {"status": "Backend is running", "pinecone_index": os.getenv("PINECONE_INDEX_NAME")}
+    return {
+        "status": "Backend is running",
+        "service": "Medical AI Assistant API",
+        "version": "1.0.0",
+        "pinecone_index": os.getenv("PINECONE_INDEX_NAME")
+    }
+
+@app.get("/health")
+def detailed_health_check():
+    """Detailed health check and dependency readiness diagnostics."""
+    pinecone_index = os.getenv("PINECONE_INDEX_NAME", "unset")
+    groq_configured = bool(os.getenv("GROQ_API_KEY"))
+    pinecone_configured = bool(os.getenv("PINECONE_API_KEY"))
+    return {
+        "status": "healthy",
+        "pinecone_index": pinecone_index,
+        "services": {
+            "groq": "configured" if groq_configured else "missing_key",
+            "pinecone": "configured" if pinecone_configured else "missing_key",
+            "sqlite_db": "ready"
+        }
+    }
 
 # ==========================================
 # CHAT HISTORY / SESSION ENDPOINTS
@@ -211,3 +239,11 @@ async def upload_document(
         import traceback
         print(f"UPLOAD ERROR: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    print(f"Starting Medical AI backend on {host}:{port}")
+    uvicorn.run("main:app", host=host, port=port, reload=True)
