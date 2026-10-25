@@ -11,10 +11,11 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 import shutil
 from pydantic import BaseModel, Field
-
 from dotenv import load_dotenv
 
-# Load environment variables from your .env file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Load environment variables from backend/.env or root .env
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv()
 
 # Import chat history functions
@@ -25,9 +26,12 @@ from chat_history import (
 )
 
 # 1. Initialize Groq LLM
+groq_api_key = os.getenv("GROQ_API_KEY")
+groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
 llm = ChatGroq(
-    model="openai/gpt-oss-20b",
-    api_key=os.getenv("GROQ_API_KEY"),
+    model=groq_model,
+    api_key=groq_api_key or "gsk_placeholder_key_configure_in_env",
     temperature=0.1,
     max_tokens=4096
 )
@@ -70,10 +74,14 @@ def health_check():
 def detailed_health_check():
     """Detailed health check and dependency readiness diagnostics."""
     pinecone_index = os.getenv("PINECONE_INDEX_NAME", "unset")
-    groq_configured = bool(os.getenv("GROQ_API_KEY"))
-    pinecone_configured = bool(os.getenv("PINECONE_API_KEY"))
+    groq_key = os.getenv("GROQ_API_KEY")
+    groq_configured = bool(groq_key and groq_key != "your_groq_api_key_here")
+    pinecone_key = os.getenv("PINECONE_API_KEY")
+    pinecone_configured = bool(pinecone_key and pinecone_key != "your_pinecone_api_key_here")
+    
     return {
         "status": "healthy",
+        "model": groq_model,
         "pinecone_index": pinecone_index,
         "services": {
             "groq": "configured" if groq_configured else "missing_key",
@@ -120,8 +128,8 @@ async def delete_chat_session(session_id: str):
 @app.patch("/sessions/{session_id}")
 async def update_chat_session(
     session_id: str,
-    title: str = Form(None),
-    active_document: str = Form(None)
+    title: Optional[str] = Form(None),
+    active_document: Optional[str] = Form(None)
 ):
     """Update session title or active document."""
     if title is not None:
@@ -143,6 +151,13 @@ async def chat_endpoint(
     session_id: str = Form("")  # Link to a chat session
 ):
     try:
+        current_api_key = os.getenv("GROQ_API_KEY")
+        if not current_api_key or current_api_key in ("your_groq_api_key_here", "gsk_placeholder_key_configure_in_env"):
+            raise HTTPException(
+                status_code=500,
+                detail="GROQ_API_KEY is not configured. Please add your Groq API key in backend/.env"
+            )
+
         # Setup config for memory persistence
         config = {"configurable": {"thread_id": thread_id}}
         
@@ -154,7 +169,6 @@ async def chat_endpoint(
             # Auto-title the session with the first message if it's still "New Chat"
             session = get_session(session_id)
             if session and session["title"] == "New Chat":
-                # Use first 50 chars of the first message as title
                 auto_title = message[:50] + ("..." if len(message) > 50 else "")
                 update_session_title(session_id, auto_title)
         
@@ -165,7 +179,9 @@ async def chat_endpoint(
             "file_context": "",
             "intent": "",
             "safety_level": "",
-            "active_document": active_document
+            "active_document": active_document,
+            "requires_doctor": False,
+            "medical_knowledge_context": ""
         }
         result = app_brain.invoke(inputs, config=config)
         
@@ -176,6 +192,8 @@ async def chat_endpoint(
             add_message(session_id, "ai", ai_response)
         
         return {"response": ai_response}
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
@@ -195,39 +213,43 @@ async def upload_document(
     session_id: str = Form("")  # Link upload to a session
 ):
     try:
-        # Validate file type
+        # Validate file presence and extension
+        if not file or not file.filename:
+            raise HTTPException(status_code=400, detail="No file was uploaded.")
+            
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported.")
         
         # 1. Create a safe place to store the uploaded file temporarily
-        upload_dir = "uploaded_files"
+        upload_dir = os.path.join(BASE_DIR, "uploaded_files")
         os.makedirs(upload_dir, exist_ok=True)
         
-        file_path = os.path.join(upload_dir, file.filename)
+        safe_filename = os.path.basename(file.filename)
+        file_path = os.path.join(upload_dir, safe_filename)
         
         # 2. Save the file to your backend folder
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # 3. Process the file into Pinecone!
-        print(f"File received from user {user_id}. Starting ingestion...")
+        # 3. Process the file into Pinecone & BM25
+        print(f"File received from user {user_id}: {safe_filename}. Starting ingestion...")
         result = ingest_pdf(file_path, user_id=user_id)
         
         # 4. Update session with document info
         if session_id:
-            update_session_document(session_id, file.filename)
+            update_session_document(session_id, safe_filename)
             # Update title to include document name
-            update_session_title(session_id, f"📄 {file.filename}")
+            update_session_title(session_id, f"📄 {safe_filename}")
             # Add a system message to the chat history
             add_message(
                 session_id, "ai",
-                f"📄 {file.filename} uploaded successfully!\n📊 {result['total_pages']} pages → {result['total_chunks']} chunks processed and stored in Pinecone.\n\n🔍 All your questions will now be answered from this document."
+                f"📄 {safe_filename} uploaded successfully!\n📊 {result['total_pages']} pages → {result['total_chunks']} chunks processed and stored in Pinecone.\n\n🔍 All your questions will now be answered from this document."
             )
         
         return {
             "status": "success",
-            "message": f"✅ {file.filename} uploaded successfully!",
-            "filename": file.filename,
+            "message": f"✅ {safe_filename} uploaded successfully!",
+            "filename": safe_filename,
             "total_pages": result["total_pages"],
             "total_chunks": result["total_chunks"],
             "chunk_previews": result["chunk_previews"]
@@ -235,6 +257,8 @@ async def upload_document(
 
     except HTTPException:
         raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         import traceback
         print(f"UPLOAD ERROR: {traceback.format_exc()}")

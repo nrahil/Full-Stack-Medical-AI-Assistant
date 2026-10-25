@@ -25,12 +25,19 @@ def get_hybrid_retriever(user_id: str, active_document: str = ""):
     )
     
     # 2. Setup BM25 Retriever
-    bm25_path = "bm25_retriever.pkl"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bm25_path = os.path.join(base_dir, "bm25_retriever.pkl")
+    if not os.path.exists(bm25_path) and os.path.exists("bm25_retriever.pkl"):
+        bm25_path = "bm25_retriever.pkl"
+        
     bm25_retriever = None
     if os.path.exists(bm25_path):
-        with open(bm25_path, "rb") as f:
-            bm25_retriever = pickle.load(f)
-            bm25_retriever.k = 10
+        try:
+            with open(bm25_path, "rb") as f:
+                bm25_retriever = pickle.load(f)
+                bm25_retriever.k = 10
+        except Exception as e:
+            print(f"  Warning: Failed to load BM25 retriever: {e}")
             
     def hybrid_search(query: str):
         print(f"  Hybrid Search for: '{query}'")
